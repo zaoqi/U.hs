@@ -12,36 +12,39 @@
 
 --You should have received a copy of the GNU Affero General Public License
 --along with this program.  If not, see <http://www.gnu.org/licenses/>.
-{-# LANGUAGE DataKinds, TypeOperators, KindSignatures, GADTs, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, AllowAmbiguousTypes,
-UndecidableInstances, IncoherentInstances, NoMonomorphismRestriction #-}
-module Data.U (
-    U(),
-    t,
-    u
-    ) where
+{-# LANGUAGE DataKinds, TypeOperators, KindSignatures, GADTs,
+MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, AllowAmbiguousTypes,
+UndecidableInstances, IncoherentInstances, NoMonomorphismRestriction,
+ScopedTypeVariables #-}
+
+module Data.U where
 
 data U :: [*] -> * where
     UOne :: x -> U (x : xs)
     USucc :: U xs -> U (x : xs)
 
-class T1 a b where
-    t1 :: (U a) -> (U b)
-instance T1 a a where
-    t1 = id
-instance T1 xs (x : xs) where
-    t1 = USucc
-instance T1 (x : y : xs) (y : x : xs) where
-    t1 (UOne x) = USucc (UOne x)
-    t1 (USucc (UOne x)) = UOne x
-    t1 (USucc (USucc xs)) = USucc (USucc xs)
-instance T1 xs ys => T1 (x : xs) (x : ys) where
-    t1 (UOne x) = UOne x
-    t1 (USucc xs) = USucc (t1 xs)
-t = t1 . t1 . t1 . t1 . t1 . t1 . t1 . t1
+class Usuccs a b where
+    usuccs :: U a -> U b
+instance Usuccs a a where
+    usuccs = id
+instance Usuccs xs ys => Usuccs (x : xs) (x : ys) where
+    usuccs (UOne x) = UOne x
+    usuccs (USucc xs) = USucc (usuccs xs)
+instance Usuccs xs (x : xs) where
+    usuccs = USucc
+instance Usuccs xs ys => Usuccs xs (y : ys) where
+    usuccs x = USucc (usuccs x)
 
-uone :: a -> U '[a]
-uone = UOne
-u x = t (uone x)
+u :: forall x xs. Usuccs '[x] xs => x -> U xs
+u x = usuccs (UOne x :: U '[x])
+
+class T a b where
+    t :: U a -> U b
+instance Usuccs '[x] t => T '[x] t where
+    t (UOne x) = u x
+instance (T xs t, Usuccs '[x] t) => T (x ': xs) t where
+    t (UOne x) = u x
+    t (USucc xs) = t xs
 
 instance Eq x => Eq (U '[x]) where
     UOne x == UOne y = x == y
